@@ -192,7 +192,6 @@ export function useRecordingEngine({ sessionName, serverHost, segmentLengthM, is
 
         wsClient.connect(serverHost, newSessionId);
         await activateKeepAwakeAsync();
-
         refs.sessionStartTime = Date.now();
 
         elapsedTimer.current = setInterval(() => {
@@ -200,7 +199,15 @@ export function useRecordingEngine({ sessionName, serverHost, segmentLengthM, is
         }, 1000);
 
         iriTimer.current = setInterval(() => {
-            refs.currentIRI = computeRollingIRI();
+            const newIRI = computeRollingIRI();
+            refs.currentIRI = newIRI;
+            if (newIRI !== null) {
+                wsClient.send({
+                    type: 'IRI',
+                    iri_value: newIRI,
+                    timestamp: Date.now()
+                });
+            }
         }, 500);
 
         startDisplayTimer();

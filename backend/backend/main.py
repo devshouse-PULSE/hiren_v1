@@ -178,12 +178,18 @@ async def process_and_notify(websocket: WebSocket, pipeline: PULSEPipeline, segm
     """Run the ML pipeline and stream results back to the frontend."""
     try:
         result = await pipeline.process_segment(segment)
-        if websocket.client_state.name == "CONNECTED":
-            await websocket.send_json({"type": "segment_result", "data": result})
+        try:
+            if websocket.client_state.name == "CONNECTED":
+                await websocket.send_json({"type": "segment_result", "data": result})
+        except Exception as e:
+            logger.warning(f"Could not send result to websocket (maybe closed): {e}")
     except Exception as e:
         logger.error(f"Pipeline error on segment {segment.get('segment_id')}: {e}")
-        if websocket.client_state.name == "CONNECTED":
-            await websocket.send_json({"type": "error", "message": str(e)})
+        try:
+            if websocket.client_state.name == "CONNECTED":
+                await websocket.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
 
 
 # ── Dashboard REST API ────────────────────────────────────────────────────────

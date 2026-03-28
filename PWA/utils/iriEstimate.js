@@ -18,31 +18,18 @@ let speedBuffer = [];
 const BUFFER_SIZE = SAMPLE_RATE * 2; // 2 seconds of data
 
 // High-pass filter state (remove gravity DC offset)
-let filterState = { x1: 0, x2: 0, y1: 0, y2: 0 };
+let filterState = { x: 0, y: 0 };
 
 /**
- * Butterworth high-pass filter (4th order, fc=0.5Hz at 200Hz)
- * Removes gravity component from accelerometer Z
+ * Exponential Moving Average (EMA) high-pass filter
+ * Unconditionally stable, removes gravity component from accel Z.
  */
 function highPassFilter(sample) {
-  // Pre-computed coefficients for fc=0.5Hz, fs=200Hz, 2nd order
-  const b = [0.9994, -1.9988, 0.9994];
-  const a = [1.0, -1.9988, 0.9977];
-
-  const x0 = sample;
-  const y0 =
-    b[0] * x0 +
-    b[1] * filterState.x1 +
-    b[2] * filterState.x2 -
-    a[1] * filterState.y1 -
-    a[2] * filterState.y2;
-
-  filterState.x2 = filterState.x1;
-  filterState.x1 = x0;
-  filterState.y2 = filterState.y1;
-  filterState.y1 = y0;
-
-  return y0;
+  const ALPHA = 0.99; // Fc ~ 0.3 Hz at 200Hz
+  const y = ALPHA * (filterState.y + sample - filterState.x);
+  filterState.x = sample;
+  filterState.y = y;
+  return y;
 }
 
 /**
@@ -95,7 +82,7 @@ export function computeRollingIRI() {
 export function resetIRIEstimator() {
   accelBuffer = [];
   speedBuffer = [];
-  filterState = { x1: 0, x2: 0, y1: 0, y2: 0 };
+  filterState = { x: 0, y: 0 };
 }
 
 /**

@@ -239,7 +239,7 @@ class VisualRoadAssessor:
             assessment = self._parse_response(raw_text)
             assessment["segment_id"] = segment_id
             assessment["frames_analysed"] = len(selected)
-            assessment["model_used"] = "gemini-2.0-flash"
+            assessment["model_used"] = "gemini-2.5-flash-lite"
             assessment["inference_time_s"] = round(elapsed, 1)
             return assessment
 

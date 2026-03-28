@@ -56,7 +56,8 @@ class SegmentManager:
             "gps_buffer": [],
             "imu_buffer": [],
             "frames": [],      # Base64 strings or numpy arrays
-            "audio_buffer": []
+            "audio_buffer": [],
+            "iri_buffer": []
         }
         self._distance_accumulated_km = 0.0
 
@@ -95,6 +96,9 @@ class SegmentManager:
 
         elif p_type == "audio":
             self._buffer["audio_buffer"].append(data)
+            
+        elif p_type == "iri":
+            self._buffer["iri_buffer"].append(data)
 
     def _handle_gps(self, gps_data: dict):
         """Process a GPS point and check if we've crossed the segment threshold."""
@@ -144,6 +148,16 @@ class SegmentManager:
             segment["avg_speed_ms"] = 0.0
             segment["avg_speed_kmh"] = 0.0
             segment["timestamp"] = 0
+
+        # Average IRI from edge PWA
+        if segment.get("iri_buffer"):
+            iri_values = [p.get("iri_value", 0) for p in segment["iri_buffer"] if p.get("iri_value") is not None]
+            if iri_values:
+                segment["client_iri"] = sum(iri_values) / len(iri_values)
+            else:
+                segment["client_iri"] = None
+        else:
+            segment["client_iri"] = None
 
         segment["length_km"] = self._distance_accumulated_km
         

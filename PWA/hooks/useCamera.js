@@ -4,12 +4,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'expo-camera';
 
-const FRAME_INTERVAL_MS = 500;
-const FRAME_QUALITY = 0.7;
+const FRAME_INTERVAL_MS = 1200; // Increased delay to prevent native memory exhaustion crashes
+const FRAME_QUALITY = 0.5; // lower quality for faster base64 encoding
 
 export function useCamera({ onFrame, enabled = false }) {
   const [hasPermission, setHasPermission] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
@@ -39,13 +40,14 @@ export function useCamera({ onFrame, enabled = false }) {
       if (!isCaptureActive.current || !cameraRef.current) return;
       
       try {
+        // Safe capture settings to prevent Expo Go from crashing on Android Camera2 API
         const photo = await cameraRef.current.takePictureAsync({
           quality: FRAME_QUALITY,
           base64: true,
-          skipProcessing: true,
+          skipProcessing: true, 
           exif: false,
-          shutterSound: false, // Turn off shutter sound logic if supported
-          width: 640, // Resize image so payloads aren't too heavy
+          shutterSound: false, // Prevents annoying clicking
+          width: 640,
         });
         
         if (photo?.base64 && onFrameRef.current) {
@@ -58,13 +60,11 @@ export function useCamera({ onFrame, enabled = false }) {
           });
         }
       } catch (e) {
-        console.warn('Camera capture error:', e);
+        console.warn('Camera capture loop error:', e);
       }
       
-      // Wait for 1.5 seconds before asking the hardware for another picture
-      // to avoid choking the javascript thread and blocking GPS streams
       if (isCaptureActive.current) {
-        frameTimer.current = setTimeout(captureLoop, 1500);
+        frameTimer.current = setTimeout(captureLoop, FRAME_INTERVAL_MS);
       }
     }
 
