@@ -27,7 +27,7 @@ class TestSensorFusionAgent:
         return SensorFusionAgent()
 
     def _make_segment(self, iri_value=3.0, visual_condition="Fair",
-                      visual_surface="WBM", acoustic_surface="WBM",
+                      visual_surface="WBM",
                       rut_mm=12.0, pci=55):
         return {
             "segment_id": "test_seg_0001",
@@ -53,10 +53,6 @@ class TestSensorFusionAgent:
                 "rut_depth_mm": rut_mm,
                 "severity": "Moderate",
                 "confidence": "medium",
-            },
-            "acoustic": {
-                "surface_type_acoustic": acoustic_surface,
-                "confidence": 0.85,
             },
         }
 
@@ -85,12 +81,6 @@ class TestSensorFusionAgent:
                                 if c["type"] == "iri_visual_mismatch"]
         assert len(condition_conflicts) == 0
 
-    def test_surface_type_mismatch_flagged(self, agent):
-        seg = self._make_segment(visual_surface="BC", acoustic_surface="Granular")
-        result = agent.fuse(seg)
-        types = [c["type"] for c in result["conflicts"]]
-        assert "surface_type_mismatch" in types
-
     def test_data_quality_high_with_four_channels(self, agent):
         seg = self._make_segment()
         result = agent.fuse(seg)
@@ -100,7 +90,6 @@ class TestSensorFusionAgent:
         seg = self._make_segment()
         seg["visual"] = {"overall_condition": "Unknown"}
         seg["depth_3d"] = {}
-        seg["acoustic"] = {}
         result = agent.fuse(seg)
         assert result["data_quality"] == "Low"
 

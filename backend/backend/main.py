@@ -20,10 +20,15 @@ from typing import Dict, List, Optional
 # Load .env from project root BEFORE anything reads os.getenv()
 try:
     from dotenv import load_dotenv
-    _env_path = Path(__file__).parent.parent / ".env"
-    if _env_path.exists():
-        load_dotenv(_env_path)
-    else:
+    # Try both locations — user may put keys in backend/backend/.env or backend/.env
+    for _candidate in [
+        Path(__file__).parent / ".env",          # backend/backend/.env
+        Path(__file__).parent.parent / ".env",    # backend/.env  (legacy location)
+    ]:
+        if _candidate.exists():
+            load_dotenv(_candidate, override=False)  # override=False: first file wins
+    # If neither found, try .env.example as a last resort
+    if not any(Path(__file__).parent.joinpath(".env").exists(),):
         _env_example = Path(__file__).parent.parent / ".env.example"
         if _env_example.exists():
             load_dotenv(_env_example)

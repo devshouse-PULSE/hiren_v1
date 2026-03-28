@@ -12,7 +12,6 @@ Saves to output/debug/<session_id>/<segment_id>/:
     iri_result.json         — IRI computation output
     fusion_result.json      — sensor fusion output
     pipeline_result.json    — full final pipeline output
-    acoustic_result.json    — acoustic classifier output
 """
 
 import json
@@ -80,7 +79,6 @@ class DebugLogger:
             "imu_readings_count": len(segment.get("imu_buffer", [])),
             "frames_count": len(segment.get("frames", [])),
             "gps_points_count": len(segment.get("gps_buffer", [])),
-            "audio_packets_count": len(segment.get("audio_buffer", [])),
         }
 
         # Save first 5 IMU readings as sample

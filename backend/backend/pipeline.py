@@ -9,7 +9,6 @@ Coordinates the full agent processing chain for a single 100m road segment:
         │
         ├── [Sensor A] IRI Computer         → iri_result
         ├── [Sensor B] Depth Pipeline       → depth_result
-        ├── [Sensor C] Acoustic Classifier  → acoustic_result
         ├── [Agent 2] Visual Assessor       → visual_result
         │
         ├── [Agent 0] Sensor Fusion         → fused_segment
@@ -48,7 +47,6 @@ class PULSEPipeline:
         self._iri_computer       = None
         self._depth_pipeline     = None
         self._slam               = None
-        self._acoustic_clf       = None
 
         # Agents (lazy-loaded)
         self._sensor_fusion      = None
@@ -79,13 +77,15 @@ class PULSEPipeline:
             "depth_model":         os.getenv("DEPTH_MODEL", "depth-anything/Depth-Anything-V2-Small-hf"),
             "vlm_ollama_model":    os.getenv("VLM_OLLAMA_MODEL", "qwen3-vl:4b"),
             "ollama_host":         os.getenv("OLLAMA_HOST", "http://localhost:11434"),
-            "gemini_model":        os.getenv("GEMINI_MODEL", "gemini-3-flash-preview"),
+            "gemini_model":        os.getenv("GEMINI_MODEL", "gemma-3-27b-it"),
             "gemini_api_key":      os.getenv("GEMINI_API_KEY", ""),
-            "acoustic_model_path": os.getenv("ACOUSTIC_MODEL_FILE", "models/acoustic_model.pkl"),
             "irc_sample_rate":     int(os.getenv("IRI_SAMPLE_RATE", "200")),
             "min_speed_kmh":       float(os.getenv("MIN_SPEED_KMH", "20")),
             "test_mode":           os.getenv("TEST_MODE", "false").lower() == "true",
-            "aadt_default":        500,
+            # Economic cascade — real data keys
+            "data_gov_api_key":    os.getenv("DATA_GOV_API_KEY", ""),
+            "worldpop_year":       int(os.getenv("WORLDPOP_YEAR", "2020")),
+            "economic_radius_m":   int(os.getenv("ECONOMIC_RADIUS_M", "3000")),
             "rainfall_default_mm": 1200,
             "generate_gov_app":    True,
         }
@@ -97,12 +97,6 @@ class PULSEPipeline:
         if self._iri_computer is None:
             from backend.sensors.iri_computer import compute_iri, classify_iri
             self._iri_computer = (compute_iri, classify_iri)
-
-        if self._acoustic_clf is None:
-            from backend.sensors.acoustic_classifier import AcousticSurfaceClassifier
-            self._acoustic_clf = AcousticSurfaceClassifier(
-                model_path=self.config["acoustic_model_path"]
-            )
 
         if self._slam is None:
             from backend.sensors.slam_wrapper import SLAMWrapper
@@ -131,6 +125,9 @@ class PULSEPipeline:
             self._economic_cascade = EconomicCascadeEngine(
                 gemini_model=self.config["gemini_model"],
                 gemini_api_key=self.config["gemini_api_key"],
+                data_gov_api_key=self.config["data_gov_api_key"],
+                worldpop_year=self.config["worldpop_year"],
+                economic_radius_m=self.config["economic_radius_m"],
             )
 
         if self._devils_advocate is None:
@@ -197,11 +194,6 @@ class PULSEPipeline:
         result["depth_3d"] = depth_result
         self._debug.log_stage(seg_id, "depth_result", depth_result)
 
-        # ── Channel 4: Acoustic ────────────────────────────────────────────
-        acoustic_result = await asyncio.to_thread(self._run_acoustic, segment)
-        result["acoustic"] = acoustic_result
-        self._debug.log_stage(seg_id, "acoustic_result", acoustic_result)
-
         # ── Agent 2: Visual Assessment ────────────────────────────────────
         visual_result = await asyncio.to_thread(self._run_visual, segment)
         result["visual"] = visual_result
@@ -213,7 +205,6 @@ class PULSEPipeline:
             "iri":      iri_result,
             "visual":   visual_result,
             "depth_3d": depth_result,
-            "acoustic": acoustic_result,
         }
         fused = await asyncio.to_thread(self._sensor_fusion.fuse, segment_for_fusion)
         result.update(fused)
@@ -234,16 +225,20 @@ class PULSEPipeline:
         result["deterioration"] = deterioration
 
         # ── Agent 5: Economic Cascade ─────────────────────────────────────
+        # All real-data fetches (WorldPop, Nominatim, data.gov.in, AADT) happen
+        # inside compute_cascade() automatically from the segment GPS.
         gps_mid = segment.get("gps", {})
         osm_context = await asyncio.to_thread(
             self._economic_cascade.fetch_osm_context,
             lat=gps_mid.get("lat", 0),
             lng=gps_mid.get("lng", 0),
         )
+        # population=None → engine fetches real WorldPop count internally
         economic = await asyncio.to_thread(
             self._economic_cascade.compute_cascade,
             segment=fused,
             osm_context=osm_context,
+            population=None,
         )
         result["economic"] = economic
 
@@ -254,11 +249,12 @@ class PULSEPipeline:
         # ── Agent 7: Government Pipeline (if cleared) ────────────────────
         if self.config.get("generate_gov_app") and result.get("cleared_for_report"):
             district_info = {
-                "district":  "Unknown District",
-                "state":     "India",
+                "district":  economic.get("district", "Unknown District"),
+                "state":     economic.get("state", "India"),
+                "city":      economic.get("city", ""),
                 "road_name": f"Road Segment {segment['segment_id']}",
-                "village":   "",
-                "block":     "",
+                "village":   economic.get("village", ""),
+                "block":     economic.get("block", ""),
             }
             gov_app = self._gov_pipeline.draft_pmgsy_application(
                 road_data=result,
@@ -347,51 +343,6 @@ class PULSEPipeline:
             logger.error(f"Depth pipeline failed: {exc}")
             return {"rut_depth_mm": None, "error": str(exc)}
 
-    def _run_acoustic(self, segment: dict) -> dict:
-        """Classify road surface from audio buffer."""
-        audio_buf = segment.get("audio_buffer", [])
-        if not audio_buf:
-            return {"surface_type_acoustic": "Unknown", "confidence": 0.0}
-
-        try:
-            all_samples = []
-            rms_values = []
-            for pkt in audio_buf:
-                # New format: {rms, dbfs, sample_rate} from Web Audio API
-                if "rms" in pkt:
-                    rms_values.append(pkt["rms"])
-                # Legacy format: {samples: [...]}
-                elif "samples" in pkt:
-                    all_samples.extend(pkt["samples"])
-
-            # If we have real RMS values, synthesise a representative waveform
-            if rms_values and not all_samples:
-                avg_rms = float(np.mean(rms_values))
-                # Synthesize a constant-amplitude signal at mean RMS for classifier
-                n_samples = 4096
-                all_samples = (np.random.randn(n_samples) * avg_rms).tolist()
-
-            if not all_samples:
-                return {"surface_type_acoustic": "Unknown", "confidence": 0.0,
-                        "note": "No audio data received"}
-
-            if not self._acoustic_clf.is_ready:
-                avg_rms = float(np.mean(rms_values)) if rms_values else 0.0
-                return {"surface_type_acoustic": "Unknown", "confidence": 0.0,
-                        "avg_rms": round(avg_rms, 4),
-                        "note": "Acoustic model not loaded"}
-
-            audio = np.array(all_samples, dtype=np.float32)
-            result = self._acoustic_clf.classify(audio)
-            if rms_values:
-                result["avg_rms"] = round(float(np.mean(rms_values)), 4)
-                result["avg_dbfs"] = round(20 * np.log10(max(float(np.mean(rms_values)), 1e-9)), 1)
-            return result
-
-        except Exception as exc:
-            logger.error(f"Acoustic classification failed: {exc}")
-            return {"surface_type_acoustic": "Unknown", "confidence": 0.0}
-
     def _run_visual(self, segment: dict) -> dict:
         """Run visual assessment on segment frames."""
         frames = segment.get("frames", [])
@@ -419,7 +370,6 @@ class PULSEPipeline:
             # ── Aggregate sensor telemetry to enrich VLM prompt context ─────
             imu_buf = segment.get("imu_buffer", [])
             gps_buf = segment.get("gps_buffer", [])
-            audio_buf = segment.get("audio_buffer", [])
 
             sensor_telemetry: dict = {}
 
@@ -441,12 +391,6 @@ class PULSEPipeline:
                 sensor_telemetry["avg_speed_kmh"] = round(float(np.mean(speeds_ms)) * 3.6, 1)
                 sensor_telemetry["avg_heading_deg"] = round(float(np.mean(headings)), 1)
                 sensor_telemetry["avg_altitude_m"] = round(float(np.mean(altitudes)), 1)
-
-            if audio_buf:
-                rms_list = [p.get("rms", 0.0) for p in audio_buf if "rms" in p]
-                if rms_list:
-                    sensor_telemetry["audio_rms_mean"] = round(float(np.mean(rms_list)), 4)
-                    sensor_telemetry["audio_rms_max"] = round(float(np.max(rms_list)), 4)
 
             # DEBUG: Log what we're about to send to VLM
             self._debug.log_vlm_input(seg_id, pil_frames, "[dynamic prompt with telemetry]", SYSTEM_PROMPT)
