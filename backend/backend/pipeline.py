@@ -88,6 +88,7 @@ class PULSEPipeline:
             "economic_radius_m":   int(os.getenv("ECONOMIC_RADIUS_M", "3000")),
             "rainfall_default_mm": 1200,
             "generate_gov_app":    True,
+            "aadt_default":        int(os.getenv("AADT_DEFAULT", "500")),
         }
 
     # ── Lazy Initialisation ────────────────────────────────────────────────

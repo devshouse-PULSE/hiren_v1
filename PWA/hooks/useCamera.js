@@ -10,7 +10,7 @@ const FRAME_QUALITY = 0.5; // lower quality for faster base64 encoding
 export function useCamera({ onFrame, enabled = false }) {
   const [hasPermission, setHasPermission] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  
+
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
@@ -38,31 +38,31 @@ export function useCamera({ onFrame, enabled = false }) {
 
     async function captureLoop() {
       if (!isCaptureActive.current || !cameraRef.current) return;
-      
+
       try {
         // Safe capture settings to prevent Expo Go from crashing on Android Camera2 API
         const photo = await cameraRef.current.takePictureAsync({
           quality: FRAME_QUALITY,
           base64: true,
-          skipProcessing: true, 
+          skipProcessing: true,
           exif: false,
           shutterSound: false, // Prevents annoying clicking
           width: 640,
         });
-        
+
         if (photo?.base64 && onFrameRef.current) {
-          onFrameRef.current({ 
-            type: 'CAMERA', 
-            timestamp: Date.now(), 
-            image: photo.base64, 
-            width: photo.width, 
-            height: photo.height 
+          onFrameRef.current({
+            type: 'CAMERA',
+            timestamp: Date.now(),
+            image: photo.base64,
+            width: photo.width,
+            height: photo.height
           });
         }
       } catch (e) {
         console.warn('Camera capture loop error:', e);
       }
-      
+
       if (isCaptureActive.current) {
         frameTimer.current = setTimeout(captureLoop, FRAME_INTERVAL_MS);
       }
@@ -73,9 +73,9 @@ export function useCamera({ onFrame, enabled = false }) {
 
   function stopCapture() {
     isCaptureActive.current = false;
-    if (frameTimer.current) { 
-      clearTimeout(frameTimer.current); 
-      frameTimer.current = null; 
+    if (frameTimer.current) {
+      clearTimeout(frameTimer.current);
+      frameTimer.current = null;
     }
   }
 

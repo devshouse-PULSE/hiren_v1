@@ -195,7 +195,7 @@ class EconomicCascadeEngine:
         self._load_local_crop_data()
 
     def _load_local_crop_data(self):
-        csv_path = r"C:\Users\rspin\Downloads\apy.csv"
+        csv_path = r"D:\VS code\devshouse\backend\models\apy.csv"
         import os, csv
         if not os.path.exists(csv_path):
             logger.warning(f"Local crop CSV not found at {csv_path}")
@@ -841,8 +841,7 @@ OUTPUT FORMAT (respond ONLY with this JSON, no markdown fences, no commentary):
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {
                     "temperature":     0.1,   # Low temp — we want precise numbers, not creative
-                    "maxOutputTokens": 1200,
-                    "responseMimeType": "application/json",
+                    "maxOutputTokens": 1200
                 },
             }
             resp = requests.post(url, json=payload, timeout=45)

@@ -28,7 +28,7 @@ try:
         if _candidate.exists():
             load_dotenv(_candidate, override=False)  # override=False: first file wins
     # If neither found, try .env.example as a last resort
-    if not any(Path(__file__).parent.joinpath(".env").exists(),):
+    if not Path(__file__).parent.joinpath(".env").exists():
         _env_example = Path(__file__).parent.parent / ".env.example"
         if _env_example.exists():
             load_dotenv(_env_example)
@@ -157,12 +157,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             ptype = packet.get("type", "")
             pdata = packet.get("data", {})
             if ptype == "gps":
-                active_sessions[session_id]["current_gps"] = {
-                    "lat": pdata.get("lat", 0),
-                    "lng": pdata.get("lng", 0),
-                }
-                speed_ms = pdata.get("speed", 0)
-                active_sessions[session_id]["current_speed_kmh"] = round(speed_ms * 3.6, 1)
+                if session_id in active_sessions:
+                    active_sessions[session_id]["current_gps"] = {
+                        "lat": pdata.get("lat", 0),
+                        "lng": pdata.get("lng", 0),
+                    }
+                    speed_ms = pdata.get("speed", 0)
+                    active_sessions[session_id]["current_speed_kmh"] = round(speed_ms * 3.6, 1)
 
             for segment in manager.get_ready_segments():
                 logger.info(f"[{session_id}] Processing segment: {segment['segment_id']}")
@@ -176,7 +177,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
     finally:
         pipeline.finalise()
-        active_sessions.pop(session_id, None)
+        if active_sessions.get(session_id, {}).get("pipeline") is pipeline:
+            active_sessions.pop(session_id, None)
 
 
 async def process_and_notify(websocket: WebSocket, pipeline: PULSEPipeline, segment: dict):
