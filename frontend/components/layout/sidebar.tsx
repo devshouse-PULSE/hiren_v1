@@ -11,7 +11,8 @@ import {
   Camera,
   Cpu,
   Map,
-  FileText
+  FileText,
+  Database
 } from 'lucide-react';
 
 interface NavLink {
@@ -58,6 +59,11 @@ export function PulseSidebar() {
       label: "Visual Feed",
       href: "/context",
       icon: <Camera className="w-5 h-5" />,
+    },
+    {
+      label: "Pipeline Data",
+      href: "/pipeline-data",
+      icon: <Database className="w-5 h-5" />,
     },
     {
       label: "System Health",
