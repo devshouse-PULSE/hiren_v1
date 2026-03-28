@@ -184,12 +184,19 @@ class WebSocketClient {
     }
   }
 
-  _drainQueue() {
+  async _drainQueue() {
     if (this.queue.length === 0) return;
     console.log(`[WS] Draining ${this.queue.length} queued packets`);
     const toSend = [...this.queue];
     this.queue = [];
-    for (const json of toSend) this._rawSend(json);
+    
+    // Throttle the drain to prevent flooding the backend and crashing the socket
+    for (let i = 0; i < toSend.length; i++) {
+       if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) break;
+       this._rawSend(toSend[i]);
+       await new Promise(r => setTimeout(r, 5)); 
+    }
+    
     if (this.onQueueDrain) this.onQueueDrain(toSend.length);
   }
 

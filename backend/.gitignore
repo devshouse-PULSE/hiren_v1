@@ -16,7 +16,6 @@ venv.bak/
 .env.*.local
 
 # Models and Large weights
-models/*.pkl
 models/*.pt
 models/*.onnx
 models/*.bin
@@ -24,7 +23,7 @@ models/weights/
 HuggingFace/
 
 # Output and Data
-output/
+output/debug
 data/
 *.db
 *.sqlite3

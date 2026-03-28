@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const PULSE_ORIGIN =
     process.env.PULSE_API_URL ??
     process.env.NEXT_PUBLIC_PULSE_API_URL ??
-    'https://localhost:8000';
+    'http://127.0.0.1:8000';
 
 export async function GET(
     _request: NextRequest,
