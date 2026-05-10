@@ -27,8 +27,8 @@ PULSE is composed of three interconnected systems:
 
 ```mermaid
 graph LR
-    A[📱 Mobile PWA] -->|WebSockets (Live Stream)| B[💻 Backend Server]
-    B -->|HTTP Polling/REST API| C[🌐 Frontend Dashboard]
+    A["📱 Mobile PWA"] -->|"WebSockets (Live Stream)"| B["💻 Backend Server"]
+    B -->|"HTTP Polling/REST API"| C["🌐 Frontend Dashboard"]
 ```
 
 ### 1. PWA (Mobile App)
