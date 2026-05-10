@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'expo-camera';
+import { Platform } from 'react-native';
 
 const FRAME_INTERVAL_MS = 1200; // Increased delay to prevent native memory exhaustion crashes
 const FRAME_QUALITY = 0.5; // lower quality for faster base64 encoding
@@ -10,7 +11,8 @@ const FRAME_QUALITY = 0.5; // lower quality for faster base64 encoding
 export function useCamera({ onFrame, enabled = false }) {
   const [hasPermission, setHasPermission] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  
+  const [pictureSize, setPictureSize] = useState(undefined);
+
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
@@ -38,31 +40,31 @@ export function useCamera({ onFrame, enabled = false }) {
 
     async function captureLoop() {
       if (!isCaptureActive.current || !cameraRef.current) return;
-      
+
       try {
-        // Safe capture settings to prevent Expo Go from crashing on Android Camera2 API
+        // Do NOT use skipProcessing: true on Android if you want it to natively downscale!
+        // True skips orientation AND resolution constraints. False forces it to honor pictureSize.
         const photo = await cameraRef.current.takePictureAsync({
           quality: FRAME_QUALITY,
-          base64: true,
-          skipProcessing: true, 
+          base64: true, 
+          skipProcessing: false, // Essential to ensure native pictureSize downscaling
           exif: false,
-          shutterSound: false, // Prevents annoying clicking
-          width: 640,
+          shutterSound: false,
         });
-        
+
         if (photo?.base64 && onFrameRef.current) {
-          onFrameRef.current({ 
-            type: 'CAMERA', 
-            timestamp: Date.now(), 
-            image: photo.base64, 
-            width: photo.width, 
-            height: photo.height 
+          onFrameRef.current({
+            type: 'CAMERA',
+            timestamp: Date.now(),
+            image: photo.base64,
+            width: photo.width || 640,
+            height: photo.height || 480
           });
         }
       } catch (e) {
         console.warn('Camera capture loop error:', e);
       }
-      
+
       if (isCaptureActive.current) {
         frameTimer.current = setTimeout(captureLoop, FRAME_INTERVAL_MS);
       }
@@ -73,19 +75,38 @@ export function useCamera({ onFrame, enabled = false }) {
 
   function stopCapture() {
     isCaptureActive.current = false;
-    if (frameTimer.current) { 
-      clearTimeout(frameTimer.current); 
-      frameTimer.current = null; 
+    if (frameTimer.current) {
+      clearTimeout(frameTimer.current);
+      frameTimer.current = null;
     }
   }
 
-  const handleCameraReady = useCallback(() => setIsReady(true), []);
+  const handleCameraReady = useCallback(async () => {
+    if (cameraRef.current && Platform.OS !== 'web') {
+      try {
+        const sizes = await cameraRef.current.getAvailablePictureSizesAsync('4:3');
+        if (sizes && sizes.length > 0) {
+          // Sort by area ascending to find the smallest natively supported hardware resolution
+          const sorted = sizes.sort((a, b) => {
+            const [wA, hA] = a.split('x').map(Number);
+            const [wB, hB] = b.split('x').map(Number);
+            return (wA * hA) - (wB * hB);
+          });
+          setPictureSize(sorted[0]);
+        }
+      } catch (e) {
+        console.warn('Failed to query sizes', e);
+      }
+    }
+    setIsReady(true);
+  }, []);
 
   return {
     hasPermission,
     isReady,
     cameraRef,
     handleCameraReady,
+    pictureSize,
     isActive: enabled && isReady && hasPermission,
   };
 }

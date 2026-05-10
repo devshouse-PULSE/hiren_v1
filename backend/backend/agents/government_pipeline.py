@@ -165,7 +165,7 @@ funding application for road rehabilitation. Write a formal government applicati
 with these exact details:
 
 Road Name:           {district_info.get('road_name', 'Road under assessment')}
-Village/Block:       {district_info.get('village', '')} / {district_info.get('block', '')}
+City/Village/Block:  {district_info.get('city', '')} / {district_info.get('village', '')} / {district_info.get('block', '')}
 District/State:      {district_info.get('district', '')} / {district_info.get('state', '')}
 Length:              {road_data.get('length_km', 1.0):.2f} km
 IRI (measured):      {road_data.get('iri_value', 'N/A')} m/km

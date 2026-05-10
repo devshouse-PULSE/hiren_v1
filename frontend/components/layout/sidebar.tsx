@@ -10,8 +10,8 @@ import {
   Brain,
   Camera,
   Cpu,
-  Map,
-  FileText
+  FileText,
+  Database
 } from 'lucide-react';
 
 interface NavLink {
@@ -28,11 +28,6 @@ export function PulseSidebar() {
       label: "Dashboard",
       href: "/",
       icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Live Map",
-      href: "/map",
-      icon: <Map className="w-5 h-5" />,
     },
     {
       label: "PMGSY Dashboard",
@@ -58,6 +53,11 @@ export function PulseSidebar() {
       label: "Visual Feed",
       href: "/context",
       icon: <Camera className="w-5 h-5" />,
+    },
+    {
+      label: "Pipeline Data",
+      href: "/pipeline-data",
+      icon: <Database className="w-5 h-5" />,
     },
     {
       label: "System Health",

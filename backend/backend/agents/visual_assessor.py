@@ -218,8 +218,7 @@ class VisualRoadAssessor:
                 "contents": [{"parts": parts}],
                 "generationConfig": {
                     "temperature": 0.1,
-                    "maxOutputTokens": 1024,
-                    "responseMimeType": "application/json"  # Force raw JSON output
+                    "maxOutputTokens": 1024
                 }
             }
 
