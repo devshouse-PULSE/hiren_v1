@@ -238,9 +238,15 @@ def list_sessions():
         sid = seg.get("session_id", "unknown")
         session_map.setdefault(sid, []).append(seg)
 
+    def get_session_time(sid):
+        try:
+            return int(sid.split('_')[-1])
+        except (ValueError, IndexError):
+            return 0
+
     sessions = [
         _session_summary_from_segments(sid, segs)
-        for sid, segs in sorted(session_map.items())
+        for sid, segs in sorted(session_map.items(), key=lambda x: get_session_time(x[0]))
     ]
 
     # Also include currently active sessions not yet in files
@@ -379,10 +385,15 @@ def generate_report(session_id: str):
             if res_file.exists():
                 try:
                     import json
-                    latest_seg = json.loads(res_file.read_text(encoding="utf-8"))
+                    seg_data = json.loads(res_file.read_text(encoding="utf-8"))
+                    if "pmgsy_application" in seg_data or "economic" in seg_data:
+                        latest_seg = seg_data
                 except:
                     pass
                     
+    if "session_id" not in latest_seg:
+        latest_seg["session_id"] = session_id
+
     pdf_path = session_dir / f"PMGSY_Application_{session_id}.pdf"
     generate_pmgsy_pdf(latest_seg, str(pdf_path))
     

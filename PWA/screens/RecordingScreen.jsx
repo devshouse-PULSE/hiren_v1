@@ -92,7 +92,7 @@ export default function RecordingScreen() {
         {/* Camera (Flex-based now, no hardcoded height) */}
         <View style={styles.cameraContainer}>
           {camera.hasPermission ? (
-            <CameraView ref={camera.cameraRef} style={styles.camera} facing="back" onCameraReady={camera.handleCameraReady} />
+            <CameraView ref={camera.cameraRef} style={styles.camera} facing="back" pictureSize={camera.pictureSize} onCameraReady={camera.handleCameraReady} />
           ) : (
             <View style={styles.cameraPlaceholder}>
               <Text style={styles.cameraPlaceholderText}>CAM PERMISSION REQUIRED</Text>

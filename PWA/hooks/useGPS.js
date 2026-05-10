@@ -37,8 +37,8 @@ export function useGPS({ onSample, enabled = false, isTestMode = false }) {
 
     if (isTestMode) {
       // Simulate 36 km/h (10 m/s) movement directly east
-      let currentLat = 12.9716;
-      let currentLng = 77.5946;
+      let currentLat = 12.838700;
+      let currentLng = 80.155268;
 
       const timerId = setInterval(() => {
         currentLng += 0.0001; // Fake eastward movement
@@ -65,7 +65,7 @@ export function useGPS({ onSample, enabled = false, isTestMode = false }) {
     }
 
     watchRef.current = await Location.watchPositionAsync(
-      { accuracy: GPS_ACCURACY, timeInterval: 1000, distanceInterval: 0 },
+      { accuracy: GPS_ACCURACY, timeInterval: 1000, distanceInterval: 5 },
       (location) => {
         const { latitude, longitude, speed, accuracy, heading, altitude } = location.coords;
         const speedMs = speed || 0;
